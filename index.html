@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>待審核 · 保險知識研究室</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#141414;--surface2:#1c1c1c;
+  --border:#242424;--border2:#2e2e2e;
+  --gold:#c9a84c;--gold-dim:#8a6f2e;
+  --white:#e8e8e8;--muted:#666;--muted2:#444;
+  --green:#1d9e75;--red:#c0392b;--amber:#b8860b;
+}
+html,body{background:var(--bg);color:var(--white);font-family:'Inter',sans-serif;min-height:100vh;overflow-x:hidden}
+
+/* ── Topbar ── */
+.topbar{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 clamp(1rem,3vw,2rem);height:52px;
+  background:rgba(10,10,10,0.94);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+}
+.topbar-brand{font-family:'Noto Serif TC',serif;font-size:clamp(11px,1.4vw,14px);font-weight:700;color:var(--gold);letter-spacing:0.1em}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-count{font-size:11px;color:var(--muted)}
+.topbar-count span{color:var(--gold);font-weight:600}
+.btn-refresh{
+  padding:6px 14px;background:transparent;
+  border:1px solid var(--border2);border-radius:4px;
+  color:var(--muted);font-family:'Inter',sans-serif;font-size:12px;
+  cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px;
+}
+.btn-refresh:hover{border-color:var(--gold);color:var(--gold)}
+.btn-refresh.spinning .refresh-icon{animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.refresh-icon{display:inline-block;font-size:13px}
+
+/* Colour palette */
+.palette-wrap{display:flex;align-items:center;gap:7px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;padding:5px 10px}
+.palette-label{font-size:10px;color:var(--muted);letter-spacing:0.08em;white-space:nowrap}
+.palette-btn{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:transform .15s,border-color .15s}
+.palette-btn:hover{transform:scale(1.18)}
+.palette-btn.active{border-color:#fff;transform:scale(1.18)}
+.palette-btn.custom-swatch{background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:flex;align-items:center;justify-content:center;font-size:11px}
+.palette-divider{width:1px;height:18px;background:var(--border2);margin:0 2px}
+#customColorInput{position:absolute;opacity:0;width:0;height:0}
+
+/* ── Layout ── */
+.main{padding-top:52px;display:grid;grid-template-columns:260px 1fr clamp(280px,28vw,380px);min-height:100vh}
+@media(max-width:1000px){.main{grid-template-columns:220px 1fr clamp(260px,30vw,360px)}}
+@media(max-width:768px){.main{grid-template-columns:1fr;padding-top:52px}}
+
+/* ── Sidebar: draft list ── */
+.sidebar{
+  border-right:1px solid var(--border);
+  padding:1.5rem 0;
+  overflow-y:auto;
+  max-height:calc(100vh - 52px);
+  position:sticky;top:52px;
+}
+.sidebar-label{font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);padding:0 1.25rem;margin-bottom:.75rem}
+.draft-item{
+  padding:.85rem 1.25rem;
+  cursor:pointer;
+  border-left:2px solid transparent;
+  transition:all .15s;
+  border-bottom:1px solid var(--border);
+}
+.draft-item:hover{background:var(--surface);border-left-color:var(--gold-dim)}
+.draft-item.active{background:var(--surface);border-left-color:var(--gold)}
+.draft-item-id{font-size:10px;color:var(--muted);margin-bottom:3px;letter-spacing:0.08em}
+.draft-item-title{font-size:12px;color:var(--white);line-height:1.4;margin-bottom:4px}
+.draft-item-meta{font-size:10px;color:var(--muted2)}
+.draft-item-type{
+  display:inline-block;font-size:9px;
+  padding:1px 6px;border-radius:2px;
+  border:1px solid var(--border2);color:var(--muted);
+  margin-top:4px;letter-spacing:0.06em;
+}
+
+/* empty state */
+.sidebar-empty{padding:2rem 1.25rem;text-align:center;color:var(--muted);font-size:12px;line-height:1.7}
+
+/* ── Preview panel ── */
+.preview-panel{
+  padding:clamp(1.25rem,2.5vw,2rem);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  height:calc(100vh - 52px);overflow:hidden;
+  position:sticky;top:52px;
+}
+.section-label{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;flex-shrink:0}
+.carousel-viewport{overflow:hidden;flex:1;min-height:0;position:relative}
+.carousel-track{display:flex;gap:12px;height:100%;transition:transform .42s cubic-bezier(.4,0,.2,1)}
+
+/* Card 4:5 */
+.ig-card{
+  flex-shrink:0;height:100%;
+  aspect-ratio:4/5;
+  background:#0d0d0d;border:1px solid var(--border2);
+  border-radius:3px;position:relative;overflow:hidden;
+  cursor:pointer;transition:border-color .2s;
+  container-type:size;
+}
+.ig-card:hover{border-color:var(--gold-dim)}
+.ig-card.active{border-color:var(--gold)}
+.card-bg{position:absolute;inset:0;background-size:cover;background-position:center top;opacity:.32}
+.card-gradient{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.96) 0%,rgba(0,0,0,.52) 45%,rgba(0,0,0,.08) 100%)}
+.card-safe{position:absolute;inset:12%;display:flex;flex-direction:column;justify-content:space-between}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start}
+.card-num{font-size:2.2cqh;color:var(--muted);letter-spacing:0.1em}
+.card-tag{font-size:2cqh;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold);border:1px solid var(--gold-dim);padding:0.4cqh 1cqh;border-radius:2px}
+.card-body{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding-top:1rem}
+.card-headline{font-family:'Noto Serif TC',serif;font-size:6cqh;font-weight:900;line-height:1.3;color:#fff;margin-bottom:0.8cqh}
+.card-headline em{font-style:normal;color:var(--gold)}
+.card-copy{font-size:3cqh;line-height:1.75;color:rgba(255,255,255,.75)}
+.card-bottom{display:flex;justify-content:flex-end;padding-top:0.5rem}
+.card-brand{font-size:2cqh;color:var(--gold-dim);letter-spacing:0.08em;font-style:italic}
+
+/* nav */
+.carousel-nav{display:flex;align-items:center;gap:12px;margin-top:1.25rem;flex-shrink:0}
+.dots{display:flex;gap:6px;align-items:center}
+.dot{width:18px;height:2px;background:var(--border2);border-radius:1px;cursor:pointer;transition:all .25s}
+.dot.active{background:var(--gold);width:28px}
+.arr-btn{width:34px;height:34px;background:var(--surface);border:1px solid var(--border2);border-radius:2px;color:var(--white);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .2s,background .2s;flex-shrink:0}
+.arr-btn:hover{border-color:var(--gold);background:var(--surface2)}
+.arr-btn:disabled{opacity:.25;cursor:default}
+
+/* empty preview */
+.preview-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);text-align:center;gap:10px}
+.preview-empty-icon{font-size:32px;opacity:.3}
+.preview-empty-text{font-size:13px;line-height:1.7}
+
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.ig-card{animation:cardIn .38s ease both}
+
+/* ── Review panel ── */
+.review-panel{padding:clamp(1.5rem,3vw,2.5rem);display:flex;flex-direction:column;overflow-y:auto;max-height:calc(100vh - 52px);position:sticky;top:52px}
+.review-block{margin-bottom:1.75rem}
+.review-title{font-size:10px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);margin-bottom:.7rem}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.meta-item{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:9px 12px}
+.meta-key{font-size:10px;color:var(--muted);margin-bottom:3px}
+.meta-val{font-size:13px;font-weight:500;color:var(--white)}
+.meta-val.gold{color:var(--gold)}
+.caption-box{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:13px 15px;font-size:12px;line-height:1.85;color:rgba(232,232,232,.85);white-space:pre-line}
+.hashtag-list{display:flex;flex-wrap:wrap;gap:6px}
+.hashtag{font-size:11px;color:var(--gold-dim);background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:2px;padding:3px 8px}
+.schedule-row{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:11px 15px;font-size:13px}
+.schedule-icon{color:var(--gold);font-size:15px}
+.schedule-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* review empty */
+.review-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;text-align:center;line-height:1.7}
+
+/* Buttons */
+.actions{margin-top:auto}
+.divider-line{height:1px;background:var(--border);margin-bottom:1.25rem}
+.btn-agree{width:100%;padding:13px;background:var(--green);border:none;border-radius:4px;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;letter-spacing:.06em;cursor:pointer;margin-bottom:9px;display:flex;align-items:center;justify-content:center;gap:7px;transition:opacity .2s,transform .1s}
+.btn-agree:hover{opacity:.88}
+.btn-agree:active{transform:scale(.98)}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.btn-reedit{padding:11px;background:transparent;border:1px solid var(--amber);border-radius:4px;color:var(--amber);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background .2s,transform .1s}
+.btn-reedit:hover{background:rgba(184,134,11,.08)}
+.btn-reedit:active{transform:scale(.97)}
+.btn-notgood{padding:11px;background:transparent;border:1px solid var(--muted2);border-radius:4px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:border-color .2s,color .2s,transform .1s}
+.btn-notgood:hover{border-color:var(--red);color:var(--red)}
+.btn-notgood:active{transform:scale(.97)}
+
+/* ── Re-edit floating window ── */
+.reedit-panel{position:fixed;inset:0;z-index:200;pointer-events:none;opacity:0;transition:opacity .2s}
+.reedit-panel.open{opacity:1}
+.reedit-sheet{position:absolute;top:80px;left:50%;transform:translateX(-50%);width:min(680px,92vw);min-width:280px;min-height:220px;max-width:96vw;max-height:88vh;background:var(--surface);border:1px solid var(--border2);border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,.72);display:flex;flex-direction:column;overflow:hidden;pointer-events:all;resize:both}
+.reedit-titlebar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border2);cursor:grab;user-select:none;flex-shrink:0}
+.reedit-titlebar:active{cursor:grabbing}
+.reedit-titlebar-left{display:flex;align-items:center;gap:8px}
+.reedit-header-title{font-family:'Noto Serif TC',serif;font-size:15px;font-weight:700;color:var(--gold)}
+.reedit-drag-hint{font-size:10px;color:var(--muted2);letter-spacing:.06em}
+.reedit-close{width:30px;height:30px;background:var(--surface);border:1px solid var(--border2);border-radius:50%;color:var(--muted);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s,color .15s}
+.reedit-close:hover{border-color:var(--red);color:var(--red)}
+.reedit-sheet-body{overflow-y:auto;flex:1;padding:1.25rem}
+.reedit-body{display:grid;grid-template-columns:160px 1fr;gap:16px;margin-bottom:1.25rem}
+@media(max-width:600px){.reedit-body{grid-template-columns:1fr}}
+.reedit-card-list{display:flex;flex-direction:column;gap:6px}
+.reedit-card-tab{padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;cursor:pointer;font-size:11px;color:var(--muted);transition:all .15s;display:flex;align-items:center;gap:7px}
+.reedit-card-tab:hover{border-color:var(--gold-dim);color:var(--white)}
+.reedit-card-tab.active{border-color:var(--gold);color:var(--gold);background:rgba(201,168,76,.06)}
+.tab-num{font-size:10px;color:var(--muted);flex-shrink:0}
+.reedit-card-tab.active .tab-num{color:var(--gold-dim)}
+.reedit-edit-area{display:flex;flex-direction:column;gap:10px}
+.reedit-field-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.reedit-textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:10px 12px;color:var(--white);font-family:'Noto Serif TC',serif;font-size:14px;line-height:1.6;resize:vertical;min-height:80px;outline:none;transition:border-color .2s}
+.reedit-textarea:focus{border-color:var(--gold-dim)}
+.reedit-textarea.copy-ta{font-family:'Inter',sans-serif;font-size:13px;min-height:64px}
+.reedit-note-wrap{margin-top:4px}
+.reedit-note-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.reedit-note-ta{width:100%;background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:9px 12px;color:rgba(232,232,232,.8);font-family:'Inter',sans-serif;font-size:12px;line-height:1.7;resize:vertical;min-height:56px;outline:none;transition:border-color .2s}
+.reedit-note-ta:focus{border-color:var(--gold-dim)}
+.reedit-note-ta::placeholder{color:var(--muted2)}
+.reedit-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:.5rem;border-top:1px solid var(--border)}
+.reedit-save{padding:9px 22px;background:var(--amber);border:none;border-radius:4px;color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.reedit-save:hover{opacity:.85}
+.reedit-cancel{padding:9px 16px;background:transparent;border:1px solid var(--border2);border-radius:4px;color:var(--muted);font-family:'Inter',sans-serif;font-size:13px;cursor:pointer;transition:border-color .2s}
+.reedit-cancel:hover{border-color:var(--muted)}
+.quick-labels{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:1rem}
+.ql{font-size:11px;color:var(--muted);border:1px solid var(--border2);border-radius:2px;padding:4px 10px;cursor:pointer;background:transparent;font-family:'Inter',sans-serif;transition:all .15s}
+.ql:hover,.ql.sel{border-color:var(--amber);color:var(--amber);background:rgba(184,134,11,.06)}
+
+/* Agree confirm */
+.confirm-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+.confirm-overlay.open{opacity:1;pointer-events:all}
+.confirm-box{background:var(--surface);border:1px solid var(--green);border-radius:6px;padding:2rem;width:min(380px,90vw);text-align:center;transform:scale(.96);transition:transform .25s}
+.confirm-overlay.open .confirm-box{transform:scale(1)}
+.confirm-icon{font-size:28px;margin-bottom:.6rem}
+.confirm-title{font-family:'Noto Serif TC',serif;font-size:17px;font-weight:700;color:var(--green);margin-bottom:5px}
+.confirm-sub{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:1.25rem}
+.confirm-time{font-size:20px;font-weight:600;color:var(--white);margin-bottom:3px}
+.confirm-date{font-size:11px;color:var(--muted);margin-bottom:1.25rem}
+.confirm-btn{padding:10px 28px;background:var(--green);border:none;border-radius:4px;color:#fff;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.confirm-btn:hover{opacity:.85}
+
+/* Toast */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);border:1px solid var(--border2);border-radius:4px;padding:11px 18px;font-size:13px;color:var(--white);opacity:0;transition:opacity .3s,transform .3s;z-index:300;white-space:nowrap;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.toast-green{border-color:var(--green);color:var(--green)}
+.toast.toast-amber{border-color:var(--amber);color:var(--amber)}
+.toast.toast-red{border-color:var(--red);color:var(--red)}
+
+/* Loading */
+.loading-bar{position:fixed;top:52px;left:0;right:0;height:2px;background:linear-gradient(to right,var(--gold),var(--amber));z-index:99;transform:scaleX(0);transform-origin:left;transition:transform .4s}
+.loading-bar.active{animation:loadpulse 1.2s ease infinite}
+@keyframes loadpulse{0%{transform:scaleX(0);opacity:1}70%{transform:scaleX(.85);opacity:1}100%{transform:scaleX(1);opacity:0}}
+</style>
+</head>
+<body>
+
+<!-- Loading bar -->
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div class="topbar-brand">保險知識研究室 · 待審核</div>
+
+  <div class="palette-wrap">
+    <span class="palette-label" style="font-size:10px;color:var(--muted)">強調色</span>
+    <div class="palette-btn active" style="background:#c9a84c" onclick="setAccent('#c9a84c','#8a6f2e',this)"></div>
+    <div class="palette-btn" style="background:#e05c5c" onclick="setAccent('#e05c5c','#993d3d',this)"></div>
+    <div class="palette-btn" style="background:#4fa8e0" onclick="setAccent('#4fa8e0','#2d6e99',this)"></div>
+    <div class="palette-btn" style="background:#7ed896" onclick="setAccent('#7ed896','#4a9960',this)"></div>
+    <div class="palette-btn" style="background:#c97de0" onclick="setAccent('#c97de0','#8a4a99',this)"></div>
+    <div class="palette-divider"></div>
+    <div class="palette-btn custom-swatch" onclick="document.getElementById('customColorInput').click()">＋</div>
+    <input type="color" id="customColorInput" value="#c9a84c" oninput="onCustomColor(this.value)">
+  </div>
+
+  <div class="topbar-right">
+    <span class="topbar-count">待審核 <span id="draftCount">—</span> 篇</span>
+    <button class="btn-refresh" id="refreshBtn" onclick="loadDrafts()">
+      <span class="refresh-icon">↻</span> 更新
+    </button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-label">待審稿件</div>
+    <div id="draftList">
+      <div class="sidebar-empty">載入中…</div>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-panel">
+    <div class="section-label" id="previewLabel">選擇左側稿件預覽</div>
+    <div id="previewArea" class="preview-empty">
+      <div class="preview-empty-icon">◫</div>
+      <div class="preview-empty-text">從左側選擇一篇稿件<br>即可預覽 Carousel</div>
+    </div>
+    <div class="carousel-nav" id="carouselNav" style="display:none">
+      <button class="arr-btn" id="prevBtn" onclick="prev()" disabled>←</button>
+      <button class="arr-btn" id="nextBtn" onclick="next()">→</button>
+      <div class="dots" id="dots"></div>
+    </div>
+  </div>
+
+  <!-- Review panel -->
+  <div class="review-panel" id="reviewPanel">
+    <div class="review-empty">← 選擇左側稿件<br>開始審核</div>
+  </div>
+
+</div><!-- main -->
+
+<!-- Re-edit floating window -->
+<div class="reedit-panel" id="reeditPanel">
+  <div class="reedit-sheet" id="reeditSheet">
+    <div class="reedit-titlebar" id="reeditTitlebar">
+      <div class="reedit-titlebar-left">
+        <span class="reedit-header-title">✎ 直接編輯文案</span>
+        <span class="reedit-drag-hint">拖移移動 · 右下角縮放</span>
+      </div>
+      <button class="reedit-close" onclick="closeReedit()">✕</button>
+    </div>
+    <div class="reedit-sheet-body">
+      <div class="reedit-body">
+        <div class="reedit-card-list" id="reeditTabs"></div>
+        <div class="reedit-edit-area">
+          <div>
+            <div class="reedit-field-label">標題文案（大字）</div>
+            <textarea class="reedit-textarea" id="editHeadline" rows="3"></textarea>
+          </div>
+          <div>
+            <div class="reedit-field-label">內文（小字，可留空）</div>
+            <textarea class="reedit-textarea copy-ta" id="editCopy" rows="3"></textarea>
+          </div>
+          <div class="reedit-note-wrap">
+            <div class="reedit-note-label">給 AI 的修改指示（可選）</div>
+            <textarea class="reedit-note-ta" id="editNote" placeholder="例：語氣太說教，改成更像朋友提醒的方式…"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="quick-labels">
+        <button class="ql" onclick="addNoteTag(this,'封面太弱，換更衝擊的開場')">封面太弱</button>
+        <button class="ql" onclick="addNoteTag(this,'語氣太說教')">太說教</button>
+        <button class="ql" onclick="addNoteTag(this,'數字不夠具體')">數字不具體</button>
+        <button class="ql" onclick="addNoteTag(this,'對比太簡單')">對比太弱</button>
+        <button class="ql" onclick="addNoteTag(this,'字太多，壓縮')">字太多</button>
+        <button class="ql" onclick="addNoteTag(this,'結尾不清楚')">結尾不清楚</button>
+      </div>
+      <div class="reedit-actions">
+        <button class="reedit-cancel" onclick="closeReedit()">取消</button>
+        <button class="reedit-save" onclick="applyEdits()">✓ 套用修改，重新預覽</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Agree confirm -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">✓</div>
+    <div class="confirm-title">已排入排程</div>
+    <div class="confirm-sub">這組文案將在以下時間自動發佈至 Instagram</div>
+    <div class="confirm-time" id="confirmTime">—</div>
+    <div class="confirm-date" id="confirmDate">台北時間</div>
+    <button class="confirm-btn" onclick="closeConfirm()">完成</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ──
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxboG6NkzAaY_b44Wr7G0lDg9m8FjZzwnN48Rs4TXaoxNfR5A3WhImcB_JQ5eXaImC6/exec';
+
+// ── State ──
+let drafts = [];
+let activeDraft = null;
+let current = 0;
+const GAP = 12;
+
+// ── Demo data (fallback when Sheet has no 待審核 rows yet) ──
+const DEMO = [
+  {
+    稿件ID:'D-001', 生成時間:'2026/06/25 09:14', 鉤子來源:'貓王 Elvis · 遺產案',
+    模板類型:'名人事件型', 狀態:'待審核',
+    封面文案:'問題從來不是怎麼少繳稅。\n<em>是家人能不能\n拿出現金。</em>',
+    核心訊息:'貓王 Elvis 1977 年猝逝，遺產 7,700 萬美元，稅務局拿走 70%。',
+    Hashtag:'#遺產規劃 #保險 #傳承 #財務規劃 #遺產稅 #壽險 #理財 #保險知識研究室 #台灣保險 #現金流',
+    建議發文時間:'2026/06/27（六）· 18:00',
+    _cards:[
+      {tag:'遺產規劃', headline:'問題從來不是\n怎麼少繳稅。\n<em>是家人能不能\n拿出現金。</em>', copy:''},
+      {tag:'名人案例', headline:'<em>貓王 Elvis</em>\n1977 年猝逝', copy:'遺產 7,700 萬美元\n稅務局拿走 70%\n女兒 Lisa Marie 還債二十年\n\n不是沒錢——是沒有現金。'},
+      {tag:'台灣現實', headline:'台灣遺產稅\n<em>最高 20%</em>', copy:'一棟 2,000 萬的房子\n稅單可能是 400 萬現金\n九個月內繳清\n\n你的家人，準備好了嗎？'},
+      {tag:'對比',     headline:'<em>同樣是離開</em>\n結果天壤之別', copy:'沒預留 → 賣房還稅、兄弟鬩牆\n有預留 → 稅單到，錢到\n\n差別只在一個決定。'},
+      {tag:'行動',     headline:'你以為你\n規劃好了——', copy:'但你算過嗎？\n\n第一步，\n永遠是先知道你的數字。'},
+    ]
+  },
+  {
+    稿件ID:'D-002', 生成時間:'2026/06/25 09:30', 鉤子來源:'科技創辦人罹癌',
+    模板類型:'數字衝擊型', 狀態:'待審核',
+    封面文案:'你的公司，\n<em>你不在了</em>\n誰說了算？',
+    核心訊息:'股權凍結、繼承人爭議——企業主最容易忽略的保障缺口。',
+    Hashtag:'#壽險 #股權 #企業主 #保險 #傳承 #財務規劃 #理財 #保險知識研究室',
+    建議發文時間:'2026/06/29（一）· 12:00',
+    _cards:[
+      {tag:'企業主', headline:'你的公司，\n<em>你不在了</em>\n誰說了算？', copy:''},
+      {tag:'現實',   headline:'股權是資產，\n但<em>股權不是現金</em>。', copy:'繼承人要繳的稅，\n需要的是現金。\n\n你有準備嗎？'},
+      {tag:'案例',   headline:'賈伯斯走的時候\n蘋果股票跌了 <em>5%</em>', copy:'帳面 100 億。\n但稅單要現金。\n賣還是不賣？\n這才是繼承人的第一個問題。'},
+      {tag:'對比',   headline:'同樣是企業主\n<em>差別在這裡</em>', copy:'沒規劃 → 股權凍結、家人借錢繳稅\n有規劃 → 保單現金立即給付'},
+      {tag:'行動',   headline:'第一步，\n永遠是先\n<em>知道數字</em>。', copy:'你的股權值多少？\n繼承人要付多少稅？\n先算清楚。'},
+    ]
+  }
+];
+
+// ── Load drafts from GAS ──
+async function loadDrafts() {
+  const btn = document.getElementById('refreshBtn');
+  const bar = document.getElementById('loadingBar');
+  btn.classList.add('spinning');
+  bar.classList.add('active');
+
+  try {
+    const res = await fetch(GAS_URL, { method:'GET' });
+    const json = await res.json();
+
+    if (json.success && json.data && json.data.length > 0) {
+      drafts = json.data.map(parseDraftFromSheet);
+    } else {
+      // Sheet has no 待審核 rows yet — use demo data
+      drafts = DEMO;
+    }
+  } catch(e) {
+    // Network error or GAS not deployed yet — use demo data
+    drafts = DEMO;
+  }
+
+  btn.classList.remove('spinning');
+  bar.classList.remove('active');
+  renderSidebar();
+  document.getElementById('draftCount').textContent = drafts.length;
+
+  // auto-select first
+  if (drafts.length > 0 && !activeDraft) selectDraft(0);
+}
+
+function parseDraftFromSheet(row) {
+  // Build card data from sheet columns
+  const cards = [];
+  const tags = ['封面','觀念','案例','對比','行動'];
+  for (let i = 0; i < 5; i++) {
+    cards.push({
+      tag: tags[i],
+      headline: row[`張${i+1}標題`] || row['封面文案'] || '',
+      copy: row[`張${i+1}內文`] || ''
+    });
+  }
+  // fallback: if no per-card cols, use封面文案 for card 1
+  if (!row['張1標題'] && row['封面文案']) {
+    cards[0].headline = row['封面文案'];
+  }
+  return { ...row, _cards: cards };
+}
+
+// ── Sidebar ──
+function renderSidebar() {
+  const el = document.getElementById('draftList');
+  if (drafts.length === 0) {
+    el.innerHTML = '<div class="sidebar-empty">目前沒有待審核稿件</div>';
+    return;
+  }
+  el.innerHTML = drafts.map((d, i) => `
+    <div class="draft-item ${activeDraft && activeDraft.稿件ID === d.稿件ID ? 'active' : ''}" onclick="selectDraft(${i})">
+      <div class="draft-item-id">${d.稿件ID || `稿件 ${i+1}`}</div>
+      <div class="draft-item-title">${d.鉤子來源 || d.封面文案?.replace(/<[^>]+>/g,'').substring(0,28) || '未命名'}</div>
+      <div class="draft-item-meta">${d.生成時間 || ''}</div>
+      <span class="draft-item-type">${d.模板類型 || '文案'}</span>
+    </div>
+  `).join('');
+}
+
+// ── Select draft ──
+function selectDraft(i) {
+  activeDraft = drafts[i];
+  current = 0;
+  renderSidebar();
+  renderPreview();
+  renderReview();
+}
+
+// ── Preview ──
+function renderPreview() {
+  if (!activeDraft) return;
+  const cards = activeDraft._cards || [];
+  const total = cards.length;
+
+  document.getElementById('previewLabel').textContent = `Carousel 預覽 · ${total} 張（← → 鍵切換）`;
+  document.getElementById('carouselNav').style.display = 'flex';
+
+  // viewport
+  const vpEl = document.getElementById('previewArea');
+  vpEl.className = 'carousel-viewport';
+  vpEl.id = 'viewport';
+
+  vpEl.innerHTML = `<div class="carousel-track" id="track">
+    ${cards.map((c,i)=>`
+      <div class="ig-card ${i===0?'active':''}" onclick="goTo(${i})">
+        <div class="card-gradient"></div>
+        <div class="card-safe">
+          <div class="card-top">
+            <span class="card-num">0${i+1} / 0${total}</span>
+            <span class="card-tag">${c.tag||''}</span>
+          </div>
+          <div class="card-body">
+            <div class="card-headline">${hlToDisplay(c.headline)}</div>
+            ${c.copy ? `<div class="card-copy">${c.copy.replace(/\n/g,'<br>')}</div>` : ''}
+          </div>
+          <div class="card-bottom">
+            <span class="card-brand">@insurance.insightTW</span>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+
+  // dots
+  document.getElementById('dots').innerHTML = cards.map((_,i)=>
+    `<div class="dot ${i===0?'active':''}" onclick="goTo(${i})"></div>`
+  ).join('');
+
+  requestAnimationFrame(()=>{ setCardSizes(); goTo(0); });
+
+  // re-init reedit tabs
+  buildReeditTabs();
+}
+
+function hlToDisplay(raw){ return (raw||'').replace(/\n/g,'<br>'); }
+function hlToEdit(raw){ return (raw||'').replace(/<br>/g,'\n'); }
+
+// ── Carousel logic ──
+function getVp(){ return document.getElementById('viewport'); }
+function getTrack(){ return document.getElementById('track'); }
+function getCards(){ return document.querySelectorAll('.ig-card'); }
+function getDots(){ return document.querySelectorAll('.dot'); }
+
+function setCardSizes(){
+  const vp = getVp(); if(!vp) return;
+  const h = vp.offsetHeight;
+  const w = Math.round(h*4/5);
+  getCards().forEach(c=>{ c.style.height=h+'px'; c.style.width=w+'px'; });
+}
+function cardStep(){
+  const c = getCards()[0];
+  return c ? c.offsetWidth+GAP : 320+GAP;
+}
+function goTo(n){
+  const cards = getCards(); const dots = getDots();
+  if(!cards.length) return;
+  current = Math.max(0,Math.min(n,cards.length-1));
+  const track = getTrack();
+  if(track) track.style.transform=`translateX(-${current*cardStep()}px)`;
+  cards.forEach((c,i)=>c.classList.toggle('active',i===current));
+  dots.forEach((d,i)=>d.classList.toggle('active',i===current));
+  document.getElementById('prevBtn').disabled=current===0;
+  document.getElementById('nextBtn').disabled=current===cards.length-1;
+}
+function prev(){ goTo(current-1); }
+function next(){ goTo(current+1); }
+
+let rsz;
+window.addEventListener('resize',()=>{
+  clearTimeout(rsz);
+  rsz=setTimeout(()=>{ setCardSizes(); goTo(current); },60);
+});
+
+// ── Review panel ──
+function renderReview(){
+  if(!activeDraft){ document.getElementById('reviewPanel').innerHTML='<div class="review-empty">← 選擇左側稿件<br>開始審核</div>'; return; }
+  const d = activeDraft;
+  const hashtags = (d.Hashtag||'').split(/\s+/).filter(Boolean).map(h=>`<span class="hashtag">${h}</span>`).join('');
+
+  document.getElementById('reviewPanel').innerHTML = `
+    <div class="review-block">
+      <div class="review-title">稿件資訊</div>
+      <div class="meta-grid">
+        <div class="meta-item"><div class="meta-key">鉤子來源</div><div class="meta-val gold">${d.鉤子來源||'—'}</div></div>
+        <div class="meta-item"><div class="meta-key">模板類型</div><div class="meta-val">${d.模板類型||'—'}</div></div>
+        <div class="meta-item"><div class="meta-key">生成時間</div><div class="meta-val">${d.生成時間||'—'}</div></div>
+        <div class="meta-item"><div class="meta-key">稿件ID</div><div class="meta-val">${d.稿件ID||'—'}</div></div>
+      </div>
+    </div>
+    <div class="review-block">
+      <div class="review-title">核心訊息</div>
+      <div class="caption-box">${(d.核心訊息||'').replace(/\n/g,'<br>')}</div>
+    </div>
+    ${hashtags ? `<div class="review-block"><div class="review-title">Hashtags</div><div class="hashtag-list">${hashtags}</div></div>` : ''}
+    <div class="review-block">
+      <div class="review-title">建議發文時間</div>
+      <div class="schedule-row">
+        <span class="schedule-icon">◷</span>
+        <div>
+          <div>${d.建議發文時間||'待設定'}</div>
+          <div class="schedule-sub">台北時間</div>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <div class="divider-line"></div>
+      <button class="btn-agree" onclick="openConfirm()">✓ &nbsp;Agree — 排入排程</button>
+      <div class="btn-row">
+        <button class="btn-reedit" onclick="openReedit()">✎ &nbsp;Re-edit</button>
+        <button class="btn-notgood" onclick="doNotGood()">✕ &nbsp;Not Good</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Colour palette ──
+function setAccent(color,dimColor,btn){
+  document.documentElement.style.setProperty('--gold',color);
+  document.documentElement.style.setProperty('--gold-dim',dimColor||shadeColor(color,-30));
+  document.querySelectorAll('.palette-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('customColorInput').value=color;
+}
+function onCustomColor(val){
+  setAccent(val,shadeColor(val,-30),null);
+  document.querySelectorAll('.palette-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.custom-swatch').classList.add('active');
+}
+function shadeColor(hex,pct){
+  const num=parseInt(hex.replace('#',''),16);
+  const r=Math.min(255,Math.max(0,(num>>16)+pct));
+  const g=Math.min(255,Math.max(0,((num>>8)&0xff)+pct));
+  const b=Math.min(255,Math.max(0,(num&0xff)+pct));
+  return '#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+// ── Re-edit ──
+let activeTab = 0;
+function buildReeditTabs(){
+  if(!activeDraft) return;
+  const cards = activeDraft._cards||[];
+  const labels = ['封面・鉤子','名人案例','台灣現實','對比','行動呼籲'];
+  document.getElementById('reeditTabs').innerHTML = cards.map((c,i)=>`
+    <div class="reedit-card-tab ${i===0?'active':''}" onclick="switchTab(${i})">
+      <span class="tab-num">0${i+1}</span>${labels[i]||`張 ${i+1}`}
+    </div>
+  `).join('');
+}
+function openReedit(){
+  activeTab=current;
+  loadTab(activeTab);
+  const panel=document.getElementById('reeditPanel');
+  panel.classList.add('open');
+  const sheet=document.getElementById('reeditSheet');
+  sheet.style.left='50%'; sheet.style.top='80px'; sheet.style.transform='translateX(-50%)';
+}
+function closeReedit(){ document.getElementById('reeditPanel').classList.remove('open'); }
+function switchTab(n){
+  saveTab(activeTab); activeTab=n; loadTab(n);
+  document.querySelectorAll('.reedit-card-tab').forEach((t,i)=>t.classList.toggle('active',i===n));
+}
+function loadTab(n){
+  if(!activeDraft) return;
+  const c=activeDraft._cards[n]||{};
+  document.getElementById('editHeadline').value=hlToEdit(c.headline||'');
+  document.getElementById('editCopy').value=c.copy||'';
+}
+function saveTab(n){
+  if(!activeDraft||!activeDraft._cards[n]) return;
+  activeDraft._cards[n].headline=document.getElementById('editHeadline').value;
+  activeDraft._cards[n].copy=document.getElementById('editCopy').value;
+}
+function addNoteTag(el,text){
+  el.classList.toggle('sel');
+  const ta=document.getElementById('editNote');
+  if(el.classList.contains('sel')) ta.value=ta.value?ta.value+'\n'+text:text;
+}
+function applyEdits(){
+  saveTab(activeTab);
+  renderPreview();
+  closeReedit();
+  showToast('✓ 文案已更新','amber');
+}
+
+// Drag
+(function initDrag(){
+  const sheet=document.getElementById('reeditSheet');
+  const bar=document.getElementById('reeditTitlebar');
+  let drag=false,ox=0,oy=0;
+  bar.addEventListener('mousedown',e=>{
+    if(e.target.closest('button')) return;
+    drag=true;
+    const r=sheet.getBoundingClientRect();
+    sheet.style.transform='none'; sheet.style.left=r.left+'px'; sheet.style.top=r.top+'px';
+    ox=e.clientX-r.left; oy=e.clientY-r.top; e.preventDefault();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!drag) return;
+    let nx=Math.max(0,Math.min(e.clientX-ox,window.innerWidth-sheet.offsetWidth));
+    let ny=Math.max(0,Math.min(e.clientY-oy,window.innerHeight-sheet.offsetHeight));
+    sheet.style.left=nx+'px'; sheet.style.top=ny+'px';
+  });
+  document.addEventListener('mouseup',()=>{ drag=false; });
+})();
+
+// ── Agree ──
+function openConfirm(){
+  const d=activeDraft;
+  document.getElementById('confirmTime').textContent=d?.建議發文時間||'待設定';
+  document.getElementById('confirmDate').textContent='台北時間';
+  document.getElementById('confirmOverlay').classList.add('open');
+}
+function closeConfirm(){
+  document.getElementById('confirmOverlay').classList.remove('open');
+  // mark as agreed in sheet
+  if(activeDraft){
+    fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({id:activeDraft.稿件ID, status:'已通過審核'})
+    }).catch(()=>{});
+    // remove from local list
+    drafts=drafts.filter(d=>d.稿件ID!==activeDraft.稿件ID);
+    activeDraft=null;
+    document.getElementById('draftCount').textContent=drafts.length;
+    renderSidebar();
+    if(drafts.length>0) selectDraft(0);
+    else{ document.getElementById('previewArea').className='preview-empty'; document.getElementById('previewArea').id='previewArea'; document.getElementById('previewArea').innerHTML='<div class="preview-empty-icon">◫</div><div class="preview-empty-text">所有稿件已審核完畢</div>'; document.getElementById('carouselNav').style.display='none'; document.getElementById('reviewPanel').innerHTML='<div class="review-empty">所有稿件已審核完畢 🎉</div>'; }
+  }
+  showToast('✓ 已排程發佈','green');
+}
+
+// ── Not Good ──
+function doNotGood(){
+  if(activeDraft){
+    fetch(GAS_URL,{method:'POST',body:JSON.stringify({id:activeDraft.稿件ID,status:'Not Good'})}).catch(()=>{});
+    drafts=drafts.filter(d=>d.稿件ID!==activeDraft.稿件ID);
+    activeDraft=null;
+    document.getElementById('draftCount').textContent=drafts.length;
+    renderSidebar();
+    if(drafts.length>0) selectDraft(0);
+  }
+  showToast('✕ 已標記 Not Good，存入發想區','red');
+}
+
+// ── Toast ──
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast show'+(type?' toast-'+type:'');
+  setTimeout(()=>{ t.className='toast'; },3200);
+}
+
+// ── Keyboard ──
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('reeditPanel').classList.contains('open')){ if(e.key==='Escape') closeReedit(); return; }
+  if(e.key==='ArrowLeft') prev();
+  if(e.key==='ArrowRight') next();
+  if(e.key==='Escape') document.getElementById('confirmOverlay').classList.remove('open');
+});
+
+// ── Init ──
+loadDrafts();
+</script>
+</body>
+</html>
